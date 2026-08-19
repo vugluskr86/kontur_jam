@@ -59,7 +59,7 @@ export class LevelFactory {
   #material(textureKind, color = null) {
     const map = textureKind ? this.textures.get(textureKind).clone() : null;
     if (map) map.needsUpdate = true;
-    return new THREE.MeshBasicMaterial({
+    return new THREE.MeshLambertMaterial({
       map,
       color: color ?? 0xffffff,
       fog: true
@@ -237,10 +237,15 @@ export class LevelFactory {
       blob.scale.y = 0.18 + Math.random() * 0.18; group.add(blob);
     }
     group.position.set(x, 0, z); this.root.add(group);
+    const hostile = kind === 'hazard';
+    const glow = new THREE.PointLight(color, hostile ? 0.55 : 0.34, hostile ? 4.8 : 3.5, 2);
+    glow.position.set(x, 0.34, z);
+    this.root.add(glow);
     this.animations.push((dt, time) => {
       const pulse = 1 + Math.sin(time * 1.7 + x * 0.2 + z * 0.1) * 0.025;
       group.scale.set(pulse, 1, pulse);
       bright.opacity = 0.31 + (Math.sin(time * 2.4 + z) * 0.5 + 0.5) * 0.16;
+      glow.intensity = (hostile ? 0.38 : 0.20) + (Math.sin(time * 2.4 + z) * 0.5 + 0.5) * (hostile ? 0.34 : 0.22);
     });
     this.slime?.addZone({ id, x, z, radius, kind, infectionPerSecond, calmPerSecond, slowSeconds, visualStrength });
     return group;
@@ -268,10 +273,16 @@ export class LevelFactory {
     const housing = new THREE.Mesh(new THREE.BoxGeometry(width + 0.16, 0.08, 0.34), new THREE.MeshBasicMaterial({ color: P.dark, fog: true }));
     const panel = new THREE.Mesh(new THREE.BoxGeometry(width, 0.035, 0.25), new THREE.MeshBasicMaterial({ color, fog: true }));
     panel.position.y = -0.055;
-    group.add(housing, panel);
+    const light = new THREE.PointLight(color, 0.92, 7.2, 2);
+    light.position.y = -0.18;
+    group.add(housing, panel, light);
     group.position.set(x, y, z);
     this.root.add(group);
-    if (flicker) this.animations.push((dt, time) => { panel.visible = Math.sin(time * 21 + z) > -0.72; });
+    this.animations.push((dt, time) => {
+      const on = !flicker || Math.sin(time * 21 + z) > -0.72;
+      panel.visible = on;
+      light.intensity = on ? 0.78 + Math.sin(time * 2.1 + x) * 0.14 : 0.06;
+    });
     return group;
   }
 
@@ -371,7 +382,8 @@ export class LevelFactory {
 
   #setScene(background, fogNear, fogFar) {
     this.scene.background = new THREE.Color(background);
-    this.scene.fog = new THREE.Fog(background, fogNear, fogFar);
+    // Retain atmosphere while leaving enough contrast to read doors, walls and hazards.
+    this.scene.fog = new THREE.Fog(background, fogNear, Math.max(fogFar, 14));
   }
 
   _perimeter() {
@@ -559,11 +571,62 @@ export class LevelFactory {
         return false;
       }
       this.quest.add('archiveData');
+      this.quest.add('archiveDefenseActive');
+      this.enemies.spawn('sporecarrier', { x: -1.2, z: -7.8 });
+      this.enemies.spawn('whipster', { x: 1.0, z: -8.6 });
+      this.enemies.spawn('sporecarrier', { x: 3.8, z: -9.0 });
+      this.events.emit('ui:message', 'ARCHIVE DEFENSE PROTOCOL ACTIVE // CLEAR THE RESPONSE');
       this.events.emit('quest:pickup', { id: 'archiveData' });
+      this.objective.set('archiveDefense', 'CLEAR THE ARCHIVE RESPONSE', new THREE.Vector3(0, 0, -8.2));
       this.objective.set('archiveExit', 'ОТКРЫТЬ ШЛЮЗ РЕАКТОРНОГО БЛОКА', new THREE.Vector3(0, 0, -12.2));
       return true;
     }});
 
+
+    this.#on('enemy:killed', () => {
+      if (!this.quest.has('archiveDefenseActive') || this.quest.has('archiveDefense')) return;
+      if (this.enemies.alive().length > 0) return;
+      this.quest.add('archiveDefense');
+      this.events.emit('ui:message', 'ARCHIVE RESPONSE NEUTRALIZED // REACTOR AIRLOCK AVAILABLE');
+      this.objective.set('archiveExit', 'OPEN THE REACTOR AIRLOCK', new THREE.Vector3(0, 0, -12.2));
+    });
+
+    const archiveChoicePos = new THREE.Vector3(6.8, 0, -9.8);
+    this.#server(6.8, -9.8, 0);
+    let archiveDisposition = null;
+    const archiveDecision = this.interactions.add({ id: 'archiveDisposition', position: archiveChoicePos, radius: 1.15, prompt: 'E — ACCESS SERVER CORE', onUse: () => {
+      if (!this.quest.has('archiveData')) {
+        this.events.emit('ui:message', 'CORE LOCKED // EXTRACT O-41 DATA FIRST');
+        return false;
+      }
+      this.events.emit('choice:request', {
+        id: 'archiveDisposition', title: 'ARCHIVE CORE: DISPOSITION',
+        text: 'Purge the copied signal to clear the chamber, or mirror it into a portable arc cutter. Both actions leave a trace.',
+        options: [
+          { id: 'purge', label: 'PURGE THE CORE', detail: '-14 infection; fuel cache; removes nearby hostiles' },
+          { id: 'mirror', label: 'MIRROR THE SIGNAL', detail: 'Unlock ARC CUTTER; +8 infection; hostile response' }
+        ]
+      });
+      return false;
+    }});
+    this.#on('choice:resolved', ({ id, option }) => {
+      if (id !== 'archiveDisposition' || archiveDisposition) return;
+      archiveDisposition = option;
+      archiveDecision.consumed = true;
+      if (option === 'purge') {
+        this.quest.add('archivePurged');
+        this.infection.reduce(14, 'archivePurge');
+        this.belt.addAmmo('fuel', 18);
+        for (const enemy of this.enemies.alive()) this.enemies.damage(enemy, 99, 'archivePurge');
+        this.events.emit('ui:message', 'ARCHIVE PURGED // HOSTILES CLEARED // FUEL +18');
+      } else {
+        this.quest.add('archiveMirrored');
+        this.infection.add(8, 'archiveMirror');
+        this.belt.unlock('arcCutter', { cells: 24 });
+        this.enemies.spawn('wailer', { x: 1.2, z: -4.8 });
+        this.events.emit('ui:message', 'ARC CUTTER SYNCHRONIZED // SIGNAL HAS ANSWERED');
+      }
+    });
 
     this.interactions.add({ id: 'akPickup', position: akPos, radius: 1.0, mode: 'pickup', onUse: () => {
       if (this.belt.unlocked.has('ak')) return true;
@@ -618,6 +681,8 @@ export class LevelFactory {
     this.enemies.spawn('whipster', { x: 0.8, z: 5.0 });
     this.enemies.spawn('wailer', { x: -1.0, z: -1.5 });
     this.enemies.spawn('whipster', { x: 5.0, z: -8.0 });
+    const flamePos = new THREE.Vector3(-5.7, 0.48, -6.2);
+    const flameMesh = this.#pickupMesh('weapon', flamePos);
 
     // Pocket room: physically far from the corridor, entered through a portal door.
     this.#floor(10, 10, 'floor', 28, 0); this.#ceiling(10, 10, 'ceiling', 28, 0);
@@ -633,6 +698,13 @@ export class LevelFactory {
       this.player.wailTimer = 0;
       this.narrative.play('reactor', 'slimeVeil');
       this.events.emit('ui:message', 'О-41 // ШУМ ВОПЛЯ ПОГАШЕН');
+    }});
+    this.interactions.add({ id: 'flamePickup', position: flamePos, radius: 1.0, mode: 'pickup', onUse: () => {
+      if (this.belt.unlocked.has('flamethrower')) return true;
+      this.belt.unlock('flamethrower', { fuel: 72 });
+      flameMesh.removeFromParent();
+      this.events.emit('ui:message', 'FLAMETHROWER P-041 // PRESSURE TANK ONLINE');
+      return true;
     }});
     this.objective.set('reactorPortal', 'НАЙТИ ИСТОЧНИК БИОСИГНАЛА', portalDoorPos);
     let pocketEntered = this.quest.has('reactorPocketEntered');
@@ -654,12 +726,43 @@ export class LevelFactory {
     }});
 
     this.interactions.add({ id: 'pocketExit', position: exitPos, radius: 1.2, prompt: 'E — ВЕРНУТЬСЯ В РЕАКТОРНЫЙ КОРИДОР', onUse: () => {
+      // Recover gracefully if the kill event arrived while a level transition was in progress.
+      if (!this.quest.has('reactorCore') && !core.alive) {
+        this.quest.add('reactorCore');
+        this.events.emit('ui:message', 'CORE STATUS SYNCHRONIZED // EXIT UNLOCKED');
+      }
       if (!this.quest.has('reactorCore')) { this.events.emit('ui:message', 'БИОЗАМОК АКТИВЕН: ЯДРО НЕЙТРАЛИЗОВАТЬ'); return false; }
       this.quest.add('reactorPocketExited');
       this.player.position.set(0, 1.55, -7.0);
       this.objective.set('reactorExit', 'ОТКРЫТЬ СПУСК В НИЖНИЙ ТОННЕЛЬ', new THREE.Vector3(0, 0, -11.8));
       return true;
     }});
+
+    let reactorDecision = null;
+    const reactorPanel = this.interactions.add({ id: 'reactorVent', position: new THREE.Vector3(5.9, 0, -3.0), radius: 1.15, prompt: 'E — ACCESS REACTOR VENT', onUse: () => {
+      if (!this.quest.has('reactorCore')) { this.events.emit('ui:message', 'VENT INTERLOCK // NEUTRALIZE IRRITANT CORE'); return false; }
+      this.events.emit('choice:request', {
+        id: 'reactorVent', title: 'REACTOR VENT: FINAL CYCLE',
+        text: 'A cold purge will stabilize your body. An overload will turn pressure into fuel, but wake the nest.',
+        options: [
+          { id: 'cool', label: 'COLD PURGE', detail: '-18 infection; +2 health; quieter exit' },
+          { id: 'overload', label: 'OVERLOAD VENT', detail: '+36 fuel; +10 infection; spawn a hive' }
+        ]
+      });
+      return false;
+    }});
+    this.#on('choice:resolved', ({ id, option }) => {
+      if (id !== 'reactorVent' || reactorDecision) return;
+      reactorDecision = option; reactorPanel.consumed = true;
+      this.quest.add('reactorVentDecision');
+      if (option === 'cool') {
+        this.quest.add('reactorCooled'); this.infection.reduce(18, 'reactorColdPurge'); this.player.heal(2);
+        this.events.emit('ui:message', 'COLD PURGE COMPLETE // BODY STABILIZED');
+      } else {
+        this.quest.add('reactorOverloaded'); this.infection.add(10, 'reactorOverload'); this.belt.addAmmo('fuel', 36);
+        this.enemies.spawn('hive', { x: 4.2, z: -7.2 }); this.events.emit('ui:message', 'OVERLOAD COMPLETE // HIVE AWAKENED // FUEL +36');
+      }
+    });
 
     this.#installExitGate({
       id: 'reactorExit', from: 'reactor', to: 'womb', door: reactorExitDoor,
@@ -780,8 +883,39 @@ export class LevelFactory {
       this.events.emit('world:hallucination', { active: true });
     }});
 
-    this.interactions.add({ id: 'dossier', position: dossierPos, radius: 1.0, mode: 'pickup', onUse: () => {
+    let dossierChoice = null;
+    const applyDossierChoice = (option) => {
+      if (dossierChoice) return;
+      dossierChoice = option;
+      this.quest.add('dossier');
+      if (dossierInteraction) dossierInteraction.consumed = true;
+      dossierMesh.removeFromParent();
+      if (option === 'destroy') {
+        this.quest.add('dossierDestroyed');
+        this.infection.reduce(12, 'dossierDestroyed');
+        this.player.heal(1);
+        this.belt.addAmmo('fuel', 24);
+        this.events.emit('ui:message', 'DOSSIER DESTROYED // RESONANCE DAMPED // FUEL +24');
+      } else {
+        this.quest.add('dossierPreserved');
+        this.narrative.play('womb', 'dossier');
+        this.infection.add(18, 'dossierResonance');
+        this.events.emit('ui:message', 'DOSSIER SECURED // BROADCAST EVIDENCE RECOVERED');
+      }
+      this.objective.set('memoryExit', 'EXIT THE IMPOSSIBLE MEMORY ROOM', new THREE.Vector3(30, 0, -4));
+    };
+    this.#on('choice:resolved', ({ id, option }) => { if (id === 'dossier') applyDossierChoice(option); });
+    const dossierInteraction = this.interactions.add({ id: 'dossier', position: dossierPos, radius: 1.0, onUse: () => {
       if (this.quest.has('dossier')) return true;
+      this.events.emit('choice:request', {
+        id: 'dossier', title: 'PERSONAL DOSSIER: SCALPEL',
+        text: 'The command channel orders immediate destruction. Keeping the file may reveal a route, but strengthens the O-41 resonance.',
+        options: [
+          { id: 'preserve', label: 'KEEP THE DOSSIER', detail: '+ ending evidence; +18 infection' },
+          { id: 'destroy', label: 'BURN THE DOSSIER', detail: '-12 infection; fuel cache; broadcast route lost' }
+        ]
+      });
+      return false;
       this.quest.add('dossier');
       dossierMesh.removeFromParent();
       this.narrative.play('womb', 'dossier');

@@ -1,6 +1,6 @@
 const TRANSITIONS = Object.freeze({
   perimeter: Object.freeze({ to: 'archive', requires: ['shiftPass'] }),
-  archive: Object.freeze({ to: 'reactor', requires: ['archiveData'] }),
+  archive: Object.freeze({ to: 'reactor', requires: ['archiveData', 'archiveDefense'] }),
   reactor: Object.freeze({ to: 'womb', requires: ['reactorCore'] }),
   womb: Object.freeze({ to: 'silence', requires: ['dossier'] })
 });

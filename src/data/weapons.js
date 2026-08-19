@@ -11,6 +11,14 @@ export const WEAPONS = {
     id: 'ak', name: 'АК-ОБРАЗНАЯ', short: 'АК', kind: 'hitscan', damage: 0.72,
     cooldown: 0.105, range: 24, spread: 0.018, ammo: 'rifle', pellets: 1, automatic: true
   },
+  arcCutter: {
+    id: 'arcCutter', name: 'ARC CUTTER', short: 'ARC', kind: 'arc', damage: 2.1,
+    cooldown: 0.34, range: 15, spread: 0.012, ammo: 'cells', pellets: 1
+  },
+  flamethrower: {
+    id: 'flamethrower', name: 'FLAMETHROWER P-041', short: 'FIRE', kind: 'flame', damage: 0.56,
+    cooldown: 0.075, range: 7.2, spread: 0.20, ammo: 'fuel', pellets: 1, automatic: true
+  },
   fungus: {
     id: 'fungus', name: 'ГРИБНОЙ ГРАНАТОМЁТ', short: 'О-ГР', kind: 'fungalProjectile', damage: 0,
     cooldown: 0.85, range: 15, spread: 0, ammo: 'fungalShell', pellets: 1
@@ -26,5 +34,6 @@ export const WEAPONS = {
 };
 
 export const AMMO_LABELS = {
+  cells: 'ARC', fuel: 'FUEL',
   shells: '12К', rifle: '5.45', fungalShell: 'О-41', sporeCharge: 'СП', resonance: 'РЕЗ'
 };

@@ -7,7 +7,7 @@ const noEvents = { emit() {} };
 test('every campaign transition has an explicit prerequisite contract', () => {
   assert.deepEqual(Object.keys(LEVEL_TRANSITIONS), ['perimeter', 'archive', 'reactor', 'womb']);
   assert.deepEqual(LEVEL_TRANSITIONS.perimeter, { to: 'archive', requires: ['shiftPass'] });
-  assert.deepEqual(LEVEL_TRANSITIONS.archive, { to: 'reactor', requires: ['archiveData'] });
+  assert.deepEqual(LEVEL_TRANSITIONS.archive, { to: 'reactor', requires: ['archiveData', 'archiveDefense'] });
   assert.deepEqual(LEVEL_TRANSITIONS.reactor, { to: 'womb', requires: ['reactorCore'] });
   assert.deepEqual(LEVEL_TRANSITIONS.womb, { to: 'silence', requires: ['dossier'] });
 });
@@ -20,6 +20,8 @@ test('campaign exits remain blocked until their mandatory story state exists', (
 
   assert.equal(p.canTransition('archive', 'reactor'), false);
   p.add('archiveData');
+  assert.equal(p.canTransition('archive', 'reactor'), false);
+  p.add('archiveDefense');
   assert.equal(p.canTransition('archive', 'reactor'), true);
 
   assert.equal(p.canTransition('reactor', 'womb'), false);

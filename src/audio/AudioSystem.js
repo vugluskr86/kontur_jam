@@ -183,6 +183,8 @@ export class AudioSystem {
     const configs = {
       shotgun: { f: 72, d: 0.16, noise: 0.22, cut: 760 },
       ak: { f: 105, d: 0.075, noise: 0.13, cut: 1250 },
+      arcCutter: { f: 420, d: 0.16, noise: 0.035, cut: 2450 },
+      flamethrower: { f: 58, d: 0.07, noise: 0.16, cut: 520 },
       fungus: { f: 280, d: 0.18, noise: 0.08, cut: 620 },
       drill: { f: 78, d: 0.24, noise: 0.10, cut: 900 },
       resonator: { f: 510, d: 0.22, noise: 0.04, cut: 2600 },
@@ -192,6 +194,7 @@ export class AudioSystem {
     this.#noiseBurst(c.d, c.noise, { filter: 'lowpass', frequency: c.cut, bus: 'sfx' });
     this.tone(c.f, c.d, id === 'resonator' ? 'sine' : 'square', 0.18, -c.f * 0.48);
     if (id === 'resonator') this.tone(760, 0.18, 'sine', 0.075, 260);
+    if (id === 'arcCutter') this.tone(880, 0.12, 'sine', 0.06, -210);
   }
 
   pickup() {

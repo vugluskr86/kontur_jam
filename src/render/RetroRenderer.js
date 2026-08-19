@@ -6,7 +6,8 @@ export class RetroRenderer {
     this.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(1);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.NoToneMapping;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.18;
     this.renderer.autoClear = false;
     this.renderer.domElement.className = 'game-canvas';
     host.prepend(this.renderer.domElement);
@@ -110,8 +111,9 @@ export class RetroRenderer {
           float vignette = 1.0 - smoothstep(0.34, 1.20, length(centered)) * (0.34 + infection * 0.10);
           color *= vignette;
 
-          // Very small phosphor lift so black corridors keep silhouettes instead of crushing to zero.
-          color = max(color, vec3(0.004, 0.006, 0.005));
+          // Keep the CRT image moody, but never lose navigational geometry in crushed blacks.
+          color = color * 1.06 + vec3(0.014, 0.019, 0.016);
+          color = max(color, vec3(0.018, 0.025, 0.021));
 
           // ending modes: burn=-1, merge=1, broadcast=2, sever=-2
           if (ending < -1.5) {

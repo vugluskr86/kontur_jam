@@ -6,7 +6,7 @@ export class WeaponBelt {
     this.unlocked = new Set(['pm']);
     this.slots = ['pm', null];
     this.activeSlot = 0;
-    this.ammo = { shells: 0, rifle: 0, fungalShell: 0, sporeCharge: 0, resonance: 0 };
+    this.ammo = { shells: 0, rifle: 0, cells: 0, fuel: 0, fungalShell: 0, sporeCharge: 0, resonance: 0 };
   }
 
   unlock(id, ammo = {}) {

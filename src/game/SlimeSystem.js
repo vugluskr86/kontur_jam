@@ -88,7 +88,7 @@ export class SlimeSystem {
 
   endingAvailability() {
     const attunement = this.attunement;
-    const evidence = Boolean(this.quest?.has('archiveData') && this.quest?.has('dossier'));
+    const evidence = Boolean(this.quest?.has('archiveData') && this.quest?.has('dossier') && !this.quest?.has('dossierDestroyed'));
     return {
       burn: true,
       merge: attunement >= 2,

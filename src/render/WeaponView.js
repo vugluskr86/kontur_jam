@@ -54,6 +54,18 @@ export class WeaponView {
       mesh(this.root, new THREE.BoxGeometry(0.17, 0.35, 0.19), brown, 0, -0.20, 0.03, -0.20);
       mesh(this.root, new THREE.BoxGeometry(0.22, 0.26, 0.15), brown, 0, -0.18, -0.22, 0.35);
       this.muzzle = mesh(this.root, new THREE.BoxGeometry(0.13, 0.13, 0.08), orange, 0, 0.04, -0.99);
+    } else if (id === 'arcCutter') {
+      mesh(this.root, new THREE.BoxGeometry(0.29, 0.22, 0.56), dark, 0, 0.02, -0.10);
+      mesh(this.root, new THREE.CylinderGeometry(0.08, 0.11, 0.48, 6), pale, 0, 0.04, -0.53, Math.PI / 2);
+      mesh(this.root, new THREE.TorusGeometry(0.13, 0.035, 5, 12), green, 0, 0.04, -0.54, Math.PI / 2);
+      mesh(this.root, new THREE.BoxGeometry(0.16, 0.34, 0.18), brown, 0, -0.19, 0.05, -0.18);
+      this.muzzle = mesh(this.root, new THREE.SphereGeometry(0.11, 6, 4), green, 0, 0.04, -0.82);
+    } else if (id === 'flamethrower') {
+      mesh(this.root, new THREE.CylinderGeometry(0.12, 0.16, 0.58, 7), dark, 0, 0.02, -0.16, Math.PI / 2);
+      mesh(this.root, new THREE.CylinderGeometry(0.10, 0.10, 0.72, 7), steel, 0, 0.05, -0.55, Math.PI / 2);
+      mesh(this.root, new THREE.SphereGeometry(0.16, 7, 5), brown, 0, -0.12, 0.08);
+      mesh(this.root, new THREE.BoxGeometry(0.18, 0.34, 0.18), brown, 0, -0.22, 0.11, -0.18);
+      this.muzzle = mesh(this.root, new THREE.ConeGeometry(0.15, 0.35, 6), orange, 0, 0.05, -0.98, Math.PI / 2);
     } else if (id === 'fungus') {
       mesh(this.root, new THREE.CylinderGeometry(0.14, 0.18, 0.72, 7), green, 0, 0.02, -0.18, Math.PI / 2);
       mesh(this.root, new THREE.SphereGeometry(0.20, 7, 5), pale, 0, 0.04, -0.55);

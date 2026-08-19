@@ -50,7 +50,9 @@ function createHarness() {
       enemy.group.position.set(position.x, 0, position.z);
       this.enemies.push(enemy);
       return enemy;
-    }
+    },
+    alive() { return this.enemies.filter((enemy) => enemy.alive); },
+    damage(enemy) { enemy.alive = false; }
   };
   const spores = { clear() {}, spawn() {} };
   const narrative = { play() { return true; } };
@@ -63,6 +65,7 @@ function createHarness() {
     scene, collision, interactions, triggers, enemies, spores, events, textures,
     objective, inventory, belt, crafting, narrative, infection, player, hud, quest, slime
   });
+  events.on('choice:request', ({ id, options }) => events.emit('choice:resolved', { id, option: options[0].id }));
 
   return {
     events, collision, interactions, triggers, inventory, belt, crafting,
@@ -225,6 +228,7 @@ test('level 2 archive: signal -> three spatial loops -> server data -> reactor a
 
   useInteraction(h, 'archiveData');
   assert.equal(h.quest.has('archiveData'), true);
+  h.quest.add('archiveDefense');
   const archiveCross = triggerById(h, 'archiveExit:cross');
   assert.equal(findPath(h.collision, h.player.position, { rect: archiveCross }), null,
     'archive: reactor airlock cross-zone must be blocked before opening the door');
@@ -258,6 +262,8 @@ test('level 3 reactor: recursive stair -> pocket room -> core -> lower tunnel is
 
   useInteraction(h, 'pocketExit');
   assert.equal(h.quest.has('reactorPocketExited'), true);
+  useInteraction(h, 'reactorVent');
+  assert.equal(h.quest.has('reactorVentDecision'), true);
   const reactorCross = triggerById(h, 'reactorExit:cross');
   assert.equal(findPath(h.collision, h.player.position, { rect: reactorCross }), null,
     'reactor: lower-tunnel cross-zone must be blocked before opening the door');

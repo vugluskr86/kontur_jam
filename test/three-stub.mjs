@@ -36,7 +36,12 @@ export class CylinderGeometry extends Geometry {}
 export class OctahedronGeometry extends Geometry {}
 export class IcosahedronGeometry extends Geometry {}
 export class MeshBasicMaterial { constructor(opts={}){Object.assign(this,opts);} clone(){return new MeshBasicMaterial({...this});} }
-export class Color { constructor(value){this.value=value;} }
+export class MeshLambertMaterial extends MeshBasicMaterial { constructor(opts={}){super(opts);} clone(){return new MeshLambertMaterial({...this});} }
+export class PointLight extends Node { constructor(color,intensity=1,distance=0,decay=1){super();this.color=new Color(color);this.intensity=intensity;this.distance=distance;this.decay=decay;} }
+export class AmbientLight extends PointLight {}
+export class HemisphereLight extends PointLight {}
+export class DirectionalLight extends PointLight {}
+export class Color { constructor(value){this.value=value;} setHex(value){this.value=value;return this;} }
 export class Fog { constructor(color,near,far){this.color=color;this.near=near;this.far=far;} }
 export class Vector3 extends Vec3 {}
 export const MathUtils={clamp:(v,a,b)=>Math.max(a,Math.min(b,v))};

@@ -32,7 +32,17 @@ export class Game {
     this.events = new EventBus();
     this.hud = new HUD(root);
     this.scene = new THREE.Scene();
+    // The baseline light deliberately keeps walls and collision silhouettes readable.
+    // Local lamps and weapon flashes are accents, never the only source of visibility.
+    this.scene.add(new THREE.HemisphereLight(0xb7d1c5, 0x46534d, 1.35));
+    this.scene.add(new THREE.AmbientLight(0x91aa9e, 0.62));
+    const keyLight = new THREE.DirectionalLight(0xd6e5d2, 0.48);
+    keyLight.position.set(-4, 7, 3);
+    this.scene.add(keyLight);
     this.camera = new THREE.PerspectiveCamera(68, 16 / 9, 0.05, 60);
+    const navigationFill = new THREE.PointLight(0x9acdb9, 0.34, 7.5, 2);
+    navigationFill.position.set(0, 0.15, 0.15);
+    this.camera.add(navigationFill);
     this.scene.add(this.camera);
     this.retro = new RetroRenderer(this.hud.viewport);
     this.input = new InputController(this.retro.renderer.domElement);
@@ -88,6 +98,7 @@ export class Game {
     this.gameEnded = false;
     this.orientationBlocked = false;
     this.levelTravel = null;
+    this.pendingChoice = null;
 
     this.#bindUI();
     this.#bindEvents();
@@ -127,6 +138,7 @@ export class Game {
       this.audio.ui();
       if (this.belt.equip(slot, weaponId)) this.hud.showMessage(`СЛОТ ${slot + 1}: ${weaponId.toUpperCase()}`);
     });
+    this.hud.bindChoice((option) => this.#resolveChoice(option));
 
     this.retro.renderer.domElement.addEventListener('click', () => {
       if (!this.paused && !this.levelTravel && this.started && document.pointerLockElement !== this.retro.renderer.domElement) this.input.requestPointerLock();
@@ -135,6 +147,7 @@ export class Game {
 
   #bindEvents() {
     this.events.on('ui:message', (text) => this.hud.showMessage(text));
+    this.events.on('choice:request', (choice) => this.#requestChoice(choice));
     this.events.on('weapon:unlocked', ({ weapon }) => { this.hud.showMessage(`ОРУЖИЕ: ${weapon.name}`, 1.6); this.audio.pickup(); });
     this.events.on('weapon:empty', () => { this.hud.showMessage('НЕТ БОЕЗАПАСА'); this.audio.ui(); });
     this.events.on('weapon:fired', ({ weapon }) => this.audio.shot(weapon.id));
@@ -208,7 +221,7 @@ export class Game {
       return;
     }
 
-    if (!this.levelTravel && this.input.consume('KeyI') && !this.gameEnded && !this.player.dead) {
+    if (!this.pendingChoice && !this.levelTravel && this.input.consume('KeyI') && !this.gameEnded && !this.player.dead) {
       this.paused = !this.paused;
       this.hud.setPauseVisible(this.paused);
       this.audio.ui();
@@ -222,7 +235,7 @@ export class Game {
 
     this.#updateLevelTravel(dt);
 
-    if (!this.paused && !this.levelTravel && !this.orientationBlocked && !this.player.dead && !this.gameEnded) {
+    if (!this.paused && !this.pendingChoice && !this.levelTravel && !this.orientationBlocked && !this.player.dead && !this.gameEnded) {
       if (this.input.consume('KeyH')) this.#useInhaler();
       if (this.input.consume('KeyQ')) this.#useShield();
       this.player.update(dt, false);
@@ -262,7 +275,7 @@ export class Game {
       danger,
       moving,
       slowed: this.player.slowTimer > 0,
-      paused: this.paused || Boolean(this.levelTravel),
+      paused: this.paused || Boolean(this.levelTravel) || Boolean(this.pendingChoice),
       dead: this.player.dead
     });
 
@@ -328,6 +341,23 @@ export class Game {
     this.input.clearMobileState();
     document.exitPointerLock?.();
     this.hud.setLevelTravel(meta);
+  }
+
+  #requestChoice(choice) {
+    if (this.pendingChoice || !choice?.id) return;
+    this.pendingChoice = choice;
+    this.input.clearMobileState();
+    document.exitPointerLock?.();
+    this.hud.showChoice(choice);
+  }
+
+  #resolveChoice(option) {
+    if (!this.pendingChoice) return;
+    const { id } = this.pendingChoice;
+    this.pendingChoice = null;
+    this.hud.hideChoice();
+    this.events.emit('choice:resolved', { id, option });
+    if (!this.orientationBlocked && !this.paused) this.input.requestPointerLock();
   }
 
   #updateLevelTravel(dt) {

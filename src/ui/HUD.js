@@ -96,6 +96,10 @@ export class HUD {
         <div class="travel-scanlines"></div>
         <div class="travel-readout"><span>CONTOUR TRANSFER</span><b id="travelTitle"></b><small id="travelSubtitle"></small></div>
       </div>
+
+      <div id="choiceOverlay" role="dialog" aria-modal="true" aria-live="assertive">
+        <div class="choice-card"><span id="choiceSignal">SIGNAL / DECISION</span><h2 id="choiceTitle"></h2><p id="choiceText"></p><div id="choiceActions"></div></div>
+      </div>
     `;
 
     const q = (selector) => this.root.querySelector(selector);
@@ -110,6 +114,7 @@ export class HUD {
     this.systemLine = q('#systemLine'); this.resonanceText = q('#resonanceText');
     this.mobileControls = q('#mobileControls'); this.moveStick = q('#moveStick'); this.moveKnob = q('#moveKnob'); this.lookStick = q('#lookStick'); this.lookKnob = q('#lookKnob'); this.mobileFire = q('#mobileFire'); this.mobileActions = [...this.root.querySelectorAll('[data-mobile-action]')]; this.orientationWarning = q('#orientationWarning');
     this.levelTravel = q('#levelTravel'); this.travelTitle = q('#travelTitle'); this.travelSubtitle = q('#travelSubtitle');
+    this.choiceOverlay = q('#choiceOverlay'); this.choiceTitle = q('#choiceTitle'); this.choiceText = q('#choiceText'); this.choiceActions = q('#choiceActions');
     this.beltSlots = [...this.root.querySelectorAll('.weapon-slot')];
     this.belt0Name = q('#belt0Name'); this.belt1Name = q('#belt1Name'); this.belt0Ammo = q('#belt0Ammo'); this.belt1Ammo = q('#belt1Ammo');
 
@@ -122,6 +127,7 @@ export class HUD {
   bindStart(handler) { this.startButton.addEventListener('click', handler); }
   bindCraft(handler) { this.recipes.addEventListener('click', (event) => { const button = event.target.closest('[data-craft]'); if (button) handler(button.dataset.craft); }); }
   bindEquip(handler) { this.weapons.addEventListener('click', (event) => { const button = event.target.closest('[data-equip]'); if (button) handler(Number(button.dataset.slot), button.dataset.equip); }); }
+  bindChoice(handler) { this.choiceActions.addEventListener('click', (event) => { const button = event.target.closest('[data-choice]'); if (button) handler(button.dataset.choice); }); }
   mobileControlElements() { return { moveStick: this.moveStick, moveKnob: this.moveKnob, lookStick: this.lookStick, lookKnob: this.lookKnob, fireButton: this.mobileFire, actionButtons: this.mobileActions }; }
 
   setPointerLocked(locked) { if (locked) this.startOverlay.classList.add('hidden'); }
@@ -135,6 +141,13 @@ export class HUD {
     this.levelTravel.classList.add('active');
   }
   clearLevelTravel() { this.levelTravel.classList.remove('active'); }
+  showChoice({ title, text, options }) {
+    this.choiceTitle.textContent = title;
+    this.choiceText.textContent = text;
+    this.choiceActions.innerHTML = options.map(({ id, label, detail }) => `<button data-choice="${id}"><b>${label}</b><small>${detail}</small></button>`).join('');
+    this.choiceOverlay.classList.add('visible');
+  }
+  hideChoice() { this.choiceOverlay.classList.remove('visible'); }
   setInteractionPrompt(text) { this.interactionPrompt.textContent = text; }
   setObjective(text) { this.objectiveText.textContent = text || '—'; }
   setSystemLine(text) { this.systemLine.textContent = text; }
