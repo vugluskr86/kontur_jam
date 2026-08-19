@@ -8,6 +8,7 @@ export class InputController {
     this.firePressed = false;
     this.fireHeld = false;
     this.mobileMove = { x: 0, y: 0 };
+    this.mobileLook = { x: 0, y: 0 };
     this.mobileEnabled = false;
 
     window.addEventListener('keydown', (event) => {
@@ -49,6 +50,8 @@ export class InputController {
   clearMobileState() {
     this.mobileMove.x = 0;
     this.mobileMove.y = 0;
+    this.mobileLook.x = 0;
+    this.mobileLook.y = 0;
     this.fireHeld = false;
   }
 
@@ -57,9 +60,9 @@ export class InputController {
       this.mobileMove.x = x;
       this.mobileMove.y = y;
     });
-    this.#bindStick(lookStick, lookKnob, (_x, _y, deltaX, deltaY) => {
-      this.lookX += deltaX * 1.15;
-      this.lookY += deltaY * 1.15;
+    this.#bindStick(lookStick, lookKnob, (x, y) => {
+      this.mobileLook.x = x;
+      this.mobileLook.y = y;
     });
 
     fireButton.addEventListener('pointerdown', (event) => {
@@ -140,8 +143,13 @@ export class InputController {
     return value;
   }
 
-  consumeLook() {
-    const result = { x: this.lookX, y: this.lookY };
+  consumeLook(dt = 0) {
+    // A held right-stick deflection is a turn rate, not a one-time swipe.
+    // The values below map a full deflection to roughly 2 radians per second.
+    const result = {
+      x: this.lookX + this.mobileLook.x * dt * 1000,
+      y: this.lookY + this.mobileLook.y * dt * 680
+    };
     this.lookX = 0;
     this.lookY = 0;
     return result;

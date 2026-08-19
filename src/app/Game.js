@@ -87,6 +87,7 @@ export class Game {
     this.flicker = 0;
     this.gameEnded = false;
     this.orientationBlocked = false;
+    this.levelTravel = null;
 
     this.#bindUI();
     this.#bindEvents();
@@ -106,6 +107,7 @@ export class Game {
 
   #bindUI() {
     this.hud.bindStart(() => {
+      void this.#enterMobileFullscreen();
       this.audio.unlock();
       if (!this.started) {
         this.started = true;
@@ -127,7 +129,7 @@ export class Game {
     });
 
     this.retro.renderer.domElement.addEventListener('click', () => {
-      if (!this.paused && this.started && document.pointerLockElement !== this.retro.renderer.domElement) this.input.requestPointerLock();
+      if (!this.paused && !this.levelTravel && this.started && document.pointerLockElement !== this.retro.renderer.domElement) this.input.requestPointerLock();
     });
   }
 
@@ -171,9 +173,9 @@ export class Game {
     this.events.on('world:flicker', ({ strength = 1 } = {}) => { this.flicker = Math.max(this.flicker, strength); this.audio.flicker(); });
     this.events.on('audio:hallucination', () => { this.audio.tone(72, 0.42, 'sine', 0.07, 18); });
     this.events.on('level:complete', ({ to }) => {
-      if (this.gameEnded) return;
+      if (this.gameEnded || this.levelTravel) return;
       this.audio.transition();
-      this.loadLevel(to);
+      this.#beginLevelTravel(to);
     });
     this.events.on('game:ending', ({ ending }) => {
       this.audio.ending(ending);
@@ -206,7 +208,7 @@ export class Game {
       return;
     }
 
-    if (this.input.consume('KeyI') && !this.gameEnded && !this.player.dead) {
+    if (!this.levelTravel && this.input.consume('KeyI') && !this.gameEnded && !this.player.dead) {
       this.paused = !this.paused;
       this.hud.setPauseVisible(this.paused);
       this.audio.ui();
@@ -218,7 +220,9 @@ export class Game {
     if (this.input.consume('KeyM')) this.hud.showMessage(this.audio.toggleMute() ? 'ЗВУК // ВЫКЛ' : 'ЗВУК // ВКЛ', 0.7);
     if (this.input.consume('KeyR') && this.player.dead) location.reload();
 
-    if (!this.paused && !this.orientationBlocked && !this.player.dead && !this.gameEnded) {
+    this.#updateLevelTravel(dt);
+
+    if (!this.paused && !this.levelTravel && !this.orientationBlocked && !this.player.dead && !this.gameEnded) {
       if (this.input.consume('KeyH')) this.#useInhaler();
       if (this.input.consume('KeyQ')) this.#useShield();
       this.player.update(dt, false);
@@ -229,8 +233,10 @@ export class Game {
       this.interactions.update(this.player.position, this.input, this.hud);
       this.triggers.update(this.player.position);
       this.levelFactory.update(dt);
-      this.infection.update(dt);
-      this.narrative.update(dt);
+      if (!this.levelTravel) {
+        this.infection.update(dt);
+        this.narrative.update(dt);
+      }
     } else {
       this.player.update(dt, true);
       this.weapons.update(dt, true);
@@ -256,7 +262,7 @@ export class Game {
       danger,
       moving,
       slowed: this.player.slowTimer > 0,
-      paused: this.paused,
+      paused: this.paused || Boolean(this.levelTravel),
       dead: this.player.dead
     });
 
@@ -313,5 +319,43 @@ export class Game {
     const { aspect } = this.retro.resize();
     this.camera.aspect = aspect;
     this.camera.updateProjectionMatrix();
+  }
+
+  #beginLevelTravel(to) {
+    const meta = LEVEL_META[to];
+    if (!meta) return;
+    this.levelTravel = { to, elapsed: 0, loaded: false };
+    this.input.clearMobileState();
+    document.exitPointerLock?.();
+    this.hud.setLevelTravel(meta);
+  }
+
+  #updateLevelTravel(dt) {
+    if (!this.levelTravel) return;
+    this.levelTravel.elapsed += dt;
+    if (!this.levelTravel.loaded && this.levelTravel.elapsed >= 0.72) {
+      this.levelTravel.loaded = true;
+      this.loadLevel(this.levelTravel.to);
+    }
+    if (this.levelTravel.elapsed >= 1.9) {
+      this.hud.clearLevelTravel();
+      this.levelTravel = null;
+    }
+  }
+
+  async #enterMobileFullscreen() {
+    if (!this.input.isTouchDevice()) return;
+
+    try {
+      const root = document.documentElement;
+      const requestFullscreen = root.requestFullscreen ?? root.webkitRequestFullscreen;
+      if (!document.fullscreenElement && requestFullscreen) {
+        await requestFullscreen.call(root, { navigationUI: 'hide' });
+      }
+      await screen.orientation?.lock?.('landscape');
+    } catch {
+      // Safari may only allow fullscreen from an installed web app.
+      // The manifest still opens it fullscreen when launched from the home screen.
+    }
   }
 }

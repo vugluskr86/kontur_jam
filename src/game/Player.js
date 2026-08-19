@@ -39,7 +39,7 @@ export class Player {
       return;
     }
 
-    const look = this.input.consumeLook();
+    const look = this.input.consumeLook(dt);
     this.yaw -= look.x * 0.00205;
     this.pitch -= look.y * 0.00205;
     this.pitch = THREE.MathUtils.clamp(this.pitch, -1.3, 1.3);

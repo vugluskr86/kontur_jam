@@ -89,6 +89,13 @@ export class HUD {
       <div id="orientationWarning" role="alert">
         <div><b>ROTATE DEVICE</b><span>KONTUR-041 REQUIRES LANDSCAPE ORIENTATION</span></div>
       </div>
+
+      <div id="levelTravel" aria-live="assertive">
+        <div class="travel-door travel-door-left"></div>
+        <div class="travel-door travel-door-right"></div>
+        <div class="travel-scanlines"></div>
+        <div class="travel-readout"><span>CONTOUR TRANSFER</span><b id="travelTitle"></b><small id="travelSubtitle"></small></div>
+      </div>
     `;
 
     const q = (selector) => this.root.querySelector(selector);
@@ -102,6 +109,7 @@ export class HUD {
     this.healthCells = q('#healthCells'); this.pauseInventory = q('#pauseInventory'); this.recipes = q('#recipes'); this.weapons = q('#weapons');
     this.systemLine = q('#systemLine'); this.resonanceText = q('#resonanceText');
     this.mobileControls = q('#mobileControls'); this.moveStick = q('#moveStick'); this.moveKnob = q('#moveKnob'); this.lookStick = q('#lookStick'); this.lookKnob = q('#lookKnob'); this.mobileFire = q('#mobileFire'); this.mobileActions = [...this.root.querySelectorAll('[data-mobile-action]')]; this.orientationWarning = q('#orientationWarning');
+    this.levelTravel = q('#levelTravel'); this.travelTitle = q('#travelTitle'); this.travelSubtitle = q('#travelSubtitle');
     this.beltSlots = [...this.root.querySelectorAll('.weapon-slot')];
     this.belt0Name = q('#belt0Name'); this.belt1Name = q('#belt1Name'); this.belt0Ammo = q('#belt0Ammo'); this.belt1Ammo = q('#belt1Ammo');
 
@@ -119,6 +127,14 @@ export class HUD {
   setPointerLocked(locked) { if (locked) this.startOverlay.classList.add('hidden'); }
   setPauseVisible(visible) { this.inventoryVisible = visible; this.pauseOverlay.classList.toggle('visible', visible); }
   setOrientationWarning(visible) { this.orientationWarning.classList.toggle('visible', visible); }
+  setLevelTravel(meta) {
+    this.travelTitle.textContent = `${meta.number}. ${meta.title}`;
+    this.travelSubtitle.textContent = meta.contour;
+    this.levelTravel.classList.remove('active');
+    void this.levelTravel.offsetWidth;
+    this.levelTravel.classList.add('active');
+  }
+  clearLevelTravel() { this.levelTravel.classList.remove('active'); }
   setInteractionPrompt(text) { this.interactionPrompt.textContent = text; }
   setObjective(text) { this.objectiveText.textContent = text || '—'; }
   setSystemLine(text) { this.systemLine.textContent = text; }

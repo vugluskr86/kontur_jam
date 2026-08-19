@@ -13,6 +13,8 @@ test('every campaign level has a distinct procedural audio profile', () => {
     assert.ok(profile.events.length >= 3, `${id}: ambience needs at least three event types`);
     assert.ok(profile.eventMax > profile.eventMin, `${id}: ambient timing range must be non-zero`);
     assert.ok(profile.step, `${id}: footstep material is required`);
+    assert.ok(profile.musicRoot >= 20, `${id}: music root is required`);
+    assert.ok(profile.musicScale.length >= 3, `${id}: music needs a scale`);
   }
   assert.notDeepEqual(AUDIO_PROFILES.perimeter.events, AUDIO_PROFILES.womb.events);
   assert.notDeepEqual(AUDIO_PROFILES.archive.events, AUDIO_PROFILES.silence.events);

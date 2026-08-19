@@ -1,0 +1,10 @@
+{
+  "name": "KONTUR-041",
+  "short_name": "KONTUR-041",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#020706",
+  "theme_color": "#07110d"
+}

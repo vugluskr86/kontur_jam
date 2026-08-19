@@ -44,6 +44,7 @@ export class AudioSystem {
       this.buses = {
         ambience: this.ctx.createGain(),
         darkAmbient: this.ctx.createGain(),
+        music: this.ctx.createGain(),
         body: this.ctx.createGain(),
         radio: this.ctx.createGain(),
         sfx: this.ctx.createGain()
@@ -99,6 +100,8 @@ export class AudioSystem {
     this.breathTimer = 0.45;
     this.stepTimer = 0;
     this.ambientTimer = 1.8 + this.random() * 2.2;
+    this.musicTimer = 0.35;
+    this.musicStep = 0;
     this.heartTimer = 0.7;
     this.stopRadio();
     this.#stopLevelBed();
@@ -154,6 +157,7 @@ export class AudioSystem {
         this.#ambientEvent(type, emitter);
         this.ambientTimer = profile.eventMin + this.random() * (profile.eventMax - profile.eventMin);
       }
+      this.#updateMusic(dt, profile, danger, infection);
     }
   }
 
@@ -484,6 +488,36 @@ export class AudioSystem {
       darkNoise.connect(darkFilter); darkFilter.connect(darkNoiseGain); darkNoiseGain.connect(darkGain); darkNoise.start();
       this.levelNodes.push({ source: darkNoise });
     }
+
+    if (this.config.music.enabled && profile.musicGain > 0 && this.buses.music) {
+      const musicGain = this.ctx.createGain();
+      musicGain.gain.setValueAtTime(0.0001, now);
+      musicGain.gain.exponentialRampToValueAtTime(profile.musicGain * this.config.music.globalGain * 0.34, now + 2.2);
+      musicGain.connect(this.buses.music);
+      for (const [ratio, type, gain] of [[0.5, 'sine', 0.75], [1, 'triangle', 0.40], [1.5, 'sine', 0.22]]) {
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = type;
+        osc.frequency.value = Math.max(20, profile.musicRoot * ratio);
+        g.gain.value = gain;
+        osc.connect(g); g.connect(musicGain); osc.start();
+        this.levelNodes.push({ source: osc });
+      }
+    }
+  }
+
+  #updateMusic(dt, profile, danger, infection) {
+    if (!this.config.music.enabled || !profile.musicGain) return;
+    this.musicTimer -= dt;
+    if (this.musicTimer > 0) return;
+
+    const scale = profile.musicScale;
+    const note = scale[this.musicStep++ % scale.length];
+    const root = profile.musicRoot * Math.pow(2, note / 12);
+    const volume = profile.musicGain * this.config.music.globalGain * (0.72 + danger * 0.22 + infection * 0.10);
+    this.tone(root, 2.2 + this.random() * 1.5, 'sine', volume, 0, 'music', (this.random() - 0.5) * 0.2);
+    this.tone(root * 1.5, 1.45 + this.random(), 'triangle', volume * 0.32, -root * 0.025, 'music', -0.12);
+    this.musicTimer = this.config.music.phraseMin + this.random() * (this.config.music.phraseMax - this.config.music.phraseMin);
   }
 
   #stopLevelBed() {
