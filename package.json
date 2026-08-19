@@ -10,7 +10,8 @@
     "test": "npm run test:logic && npm run test:levels",
     "test:logic": "node --test test/systems.test.js test/progression.test.js test/audio.test.js test/slime.test.js",
     "test:levels": "node --import ./test/register-three-stub.mjs --test test/levels.test.js",
-    "build:pages": "vite build"
+    "build:pages": "vite build",
+    "deploy": "npm run build:pages && git add docs/ && git commit -m \"Deploy to GitHub Pages\" && git push origin main"
   },
   "dependencies": {
     "three": "^0.183.0"
