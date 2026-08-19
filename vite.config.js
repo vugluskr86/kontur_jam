@@ -1,15 +1,19 @@
 import { defineConfig } from 'vite';
+import { resolve } from 'node:path';
 
 export default defineConfig({
-  // GitHub Pages serves this repository from /kontur_jam/.
-  base: '/kontur_jam/',
+  base: './',
   server: { host: '0.0.0.0' },
   build: {
     target: 'es2022',
     sourcemap: true,
-    // GitHub Pages can publish this directory directly from the default branch.
     outDir: 'docs',
-    assetsDir: 'assets',
-    emptyOutDir: true
+    emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        game: resolve(process.cwd(), 'index.html'),
+        audioSandbox: resolve(process.cwd(), 'audio-sandbox.html')
+      }
+    }
   }
 });

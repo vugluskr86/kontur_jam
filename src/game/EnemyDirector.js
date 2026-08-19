@@ -54,6 +54,7 @@ export class EnemyDirector {
       hp: options.hp ?? stats.hp, maxHp: options.hp ?? stats.hp,
       speed: options.speed ?? stats.speed, radius: stats.radius,
       alive: true, attackCooldown: 0.4 + Math.random(), abilityCooldown: 1 + Math.random(),
+      voiceCooldown: 2.5 + Math.random() * 4.0,
       slowTimer: 0, phase: Math.random() * Math.PI * 2,
       narrativeTag: options.narrativeTag ?? null
     };
@@ -79,6 +80,7 @@ export class EnemyDirector {
       if (!enemy.alive) continue;
       enemy.attackCooldown -= dt;
       enemy.abilityCooldown -= dt;
+      enemy.voiceCooldown -= dt;
       enemy.slowTimer = Math.max(0, enemy.slowTimer - dt);
       enemy.phase += dt * 6;
       this.#animate(enemy);
@@ -90,6 +92,16 @@ export class EnemyDirector {
       const nx = dx / distance;
       const nz = dz / distance;
       enemy.group.rotation.y = Math.atan2(nx, nz);
+
+      if (distance < 10 && enemy.voiceCooldown <= 0 && enemy.type !== 'collective' && enemy.type !== 'irritantCore') {
+        this.events.emit('enemy:voice', {
+          type: enemy.type,
+          enemyId: enemy.id,
+          distance,
+          position: enemy.group.position.clone()
+        });
+        enemy.voiceCooldown = 5.5 + Math.random() * 6.5;
+      }
 
       if (enemy.type === 'sporecarrier') {
         this.#chase(enemy, nx, nz, distance, dt, STATS.sporecarrier.melee);
@@ -107,7 +119,7 @@ export class EnemyDirector {
         this.#keepDistance(enemy, nx, nz, distance, dt, 5.2, 8.0);
         if (distance < 9 && enemy.abilityCooldown <= 0) {
           this.wailDistortion = 1;
-          this.events.emit('enemy:wail', { enemyId: enemy.id, distance });
+          this.events.emit('enemy:wail', { enemyId: enemy.id, distance, position: enemy.group.position.clone() });
           if (distance < 5.2) this.onPlayerDamage(1, 'wailer');
           enemy.abilityCooldown = 4.2;
         }
@@ -210,9 +222,11 @@ export class EnemyDirector {
     mesh.position.copy(origin);
     this.scene.add(mesh);
     this.projectiles.push({ mesh, velocity: dir.multiplyScalar(config.speed ?? 6), ttl: 4, damage: config.damage ?? 1, slow: config.slow ?? 0, radius: config.radius ?? 0.12 });
+    this.events.emit('enemy:attack', { type: 'projectile', position: origin.clone() });
   }
 
   #radialBurst(enemy, target, count) {
+    this.events.emit('enemy:attack', { type: enemy.type === 'collective' ? 'collectiveBurst' : 'radialBurst', position: enemy.group.position.clone() });
     const base = Math.atan2(target.x - enemy.group.position.x, target.z - enemy.group.position.z);
     for (let i = 0; i < count; i++) {
       const angle = base + (i - (count - 1) / 2) * 0.20;
@@ -276,7 +290,7 @@ export class EnemyDirector {
       enemy.abilityCooldown = 3.0;
     } else if (this.bossPhase === 2) {
       this.wailDistortion = 1;
-      this.events.emit('enemy:wail', { enemyId: enemy.id, boss: true, distance });
+      this.events.emit('enemy:wail', { enemyId: enemy.id, boss: true, distance, position: enemy.group.position.clone() });
       this.#radialBurst(enemy, playerPosition, 7);
       enemy.abilityCooldown = 2.6;
     } else {

@@ -37,16 +37,19 @@ export class NarrativeDirector {
     this.current = null;
     this.timer = 0;
     this.hud.hideSubtitle();
+    this.events?.emit('narrative:interrupt');
   }
 
   #next() {
     this.current = this.queue.shift() ?? null;
     if (!this.current) {
       this.hud.hideSubtitle();
+      this.events?.emit('narrative:end');
       return;
     }
     const readingTime = Math.max(2.4, Math.min(7.5, this.current.text.length * 0.052));
     this.timer = readingTime;
     this.hud.showSubtitle(this.current.speaker, this.current.text);
+    this.events?.emit('narrative:line', { ...this.current, duration: readingTime });
   }
 }

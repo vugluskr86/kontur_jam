@@ -11,6 +11,7 @@ import { Inventory } from '../src/game/Inventory.js';
 import { WeaponBelt } from '../src/game/WeaponBelt.js';
 import { CraftingSystem } from '../src/game/CraftingSystem.js';
 import { ProgressionSystem } from '../src/game/ProgressionSystem.js';
+import { SlimeSystem } from '../src/game/SlimeSystem.js';
 
 const PLAYER_RADIUS = 0.31;
 const GRID = 0.25;
@@ -33,7 +34,7 @@ function createHarness() {
   const crafting = new CraftingSystem(inventory, belt, events);
   const objective = new ObjectiveSystem(events);
   const quest = new ProgressionSystem(events);
-  const player = { position: new THREE.Vector3() };
+  const player = { position: new THREE.Vector3(), heal() {}, slow() {}, wailTimer: 0 };
   const scene = new THREE.Scene();
   const enemies = {
     enemies: [],
@@ -53,18 +54,19 @@ function createHarness() {
   };
   const spores = { clear() {}, spawn() {} };
   const narrative = { play() { return true; } };
-  const infection = { add() {} };
+  const infection = { add() {}, reduce() {} };
+  const slime = new SlimeSystem({ events, infection, player, quest });
   const hud = { setInteractionPrompt() {} };
   const textures = { get() { return fakeTexture(); }, sign() { return fakeTexture(); } };
 
   const levelFactory = new LevelFactory({
     scene, collision, interactions, triggers, enemies, spores, events, textures,
-    objective, inventory, belt, crafting, narrative, infection, player, hud, quest
+    objective, inventory, belt, crafting, narrative, infection, player, hud, quest, slime
   });
 
   return {
     events, collision, interactions, triggers, inventory, belt, crafting,
-    objective, quest, player, scene, enemies, spores, narrative, infection,
+    objective, quest, player, scene, enemies, spores, narrative, infection, slime,
     hud, textures, levelFactory
   };
 }
@@ -281,9 +283,11 @@ test('level 4 womb: impossible memory room -> dossier -> third contour is traver
   assertTransition(h, 'womb', 'silence', () => enterTrigger(h, 'wombExit:cross'));
 });
 
-test('level 5 white silence: resonator, boss arena and both ending pedestals are reachable', () => {
+test('level 5 white silence: direct choices reflect slime attunement and remain reachable', () => {
   const h = createHarness();
+  h.quest.add('archiveData');
   h.quest.add('dossier');
+  h.quest.increment('slimeAttunement', 2);
   load(h, 'silence');
 
   useInteraction(h, 'resonatorPickup');
@@ -296,15 +300,85 @@ test('level 5 white silence: resonator, boss arena and both ending pedestals are
   h.player.position.copy(combatPoint);
   h.events.emit('enemy:killed', { enemy: boss, source: 'resonator' });
 
-  const burn = reachInteraction(h, 'burnChoice');
+  const burn = interactionById(h, 'burnChoice');
   const merge = interactionById(h, 'mergeChoice');
+  const broadcast = interactionById(h, 'broadcastChoice');
+  const sever = interactionById(h, 'severChoice');
   assert.equal(burn.enabled, true);
-  assert.equal(merge.enabled, true);
-  assert.ok(findPath(h.collision, h.player.position, { target: merge.position, radius: merge.radius - 0.12 }), 'merge ending must be reachable');
+  assert.equal(merge.enabled, true, 'two or more slime contacts unlock merge');
+  assert.equal(broadcast.enabled, false, 'broadcast needs at least three resonance fragments');
+  assert.equal(sever.enabled, false, 'high resonance closes the sever route');
+  assert.ok(findPath(h.collision, h.player.position, { target: burn.position, radius: burn.radius - 0.12 }));
+  assert.ok(findPath(h.collision, h.player.position, { target: merge.position, radius: merge.radius - 0.12 }));
+});
 
-  let ending = null;
-  h.events.on('game:ending', (payload) => { ending = payload.ending; });
-  const input = { consume(code) { return code === 'KeyE'; } };
-  h.interactions.update(h.player.position, input, h.hud);
-  assert.equal(ending, 'burn');
+test('level 5 white silence: evidence + three slime contacts unlock the broadcast ending', () => {
+  const h = createHarness();
+  h.quest.add('archiveData'); h.quest.add('dossier'); h.quest.increment('slimeAttunement', 3);
+  load(h, 'silence');
+  const boss = h.enemies.enemies.find((enemy) => enemy.type === 'collective');
+  h.events.emit('enemy:killed', { enemy: boss, source: 'resonator' });
+  const broadcast = interactionById(h, 'broadcastChoice');
+  assert.equal(broadcast.enabled, true);
+  assert.ok(findPath(h.collision, h.player.position, { target: broadcast.position, radius: broadcast.radius - 0.12 }), 'broadcast ending must be reachable');
+});
+
+test('level 5 white silence: low resonance + evidence unlocks the sever ending', () => {
+  const h = createHarness();
+  h.quest.add('archiveData'); h.quest.add('dossier');
+  load(h, 'silence');
+  const boss = h.enemies.enemies.find((enemy) => enemy.type === 'collective');
+  h.events.emit('enemy:killed', { enemy: boss, source: 'resonator' });
+  const sever = interactionById(h, 'severChoice');
+  assert.equal(sever.enabled, true);
+  assert.ok(findPath(h.collision, h.player.position, { target: sever.position, radius: sever.radius - 0.12 }), 'sever ending must be reachable');
+});
+
+
+
+test('slime is present as gameplay state on all campaign levels', () => {
+  const h = createHarness();
+  for (const id of ['perimeter', 'archive', 'reactor', 'womb', 'silence']) {
+    load(h, id);
+    assert.ok(h.slime.zones.length >= 1, `${id}: at least one slime gameplay zone is required`);
+  }
+});
+
+test('all five levels expose positional ambience emitters without changing traversal collision', () => {
+  const h = createHarness();
+  for (const id of ['perimeter', 'archive', 'reactor', 'womb', 'silence']) {
+    const context = load(h, id);
+    assert.ok(context.audio, `${id}: audio context missing`);
+    assert.ok(Array.isArray(context.audio.emitters), `${id}: audio emitter list missing`);
+    assert.ok(context.audio.emitters.length >= 4, `${id}: environment needs at least four acoustic landmarks`);
+    for (const emitter of context.audio.emitters) {
+      assert.equal(Number.isFinite(emitter.x), true, `${id}: emitter x must be finite`);
+      assert.equal(Number.isFinite(emitter.z), true, `${id}: emitter z must be finite`);
+      assert.equal(typeof emitter.type, 'string', `${id}: emitter type is required`);
+    }
+  }
+});
+
+test('level 4 optional slime pilgrimage projects narrative onto gameplay focus in order', () => {
+  const h = createHarness();
+  h.quest.add('reactorCore');
+  load(h, 'womb');
+
+  // The second fragment is physically present but semantically locked until the first contact.
+  useInteraction(h, 'wombCall2');
+  assert.equal(h.quest.has('slime:wombCall2'), false);
+  assert.equal(h.slime.attunement, 0);
+
+  useInteraction(h, 'wombCall1');
+  assert.equal(h.quest.has('slime:wombCall1'), true);
+  assert.equal(h.objective.id, 'wombCall2');
+
+  useInteraction(h, 'wombCall2');
+  assert.equal(h.quest.has('slime:wombCall2'), true);
+  assert.equal(h.objective.id, 'wombChoir');
+
+  useInteraction(h, 'wombChoir');
+  assert.equal(h.quest.has('slime:wombChoir'), true);
+  assert.equal(h.objective.id, 'memoryRoom');
+  assert.equal(h.slime.attunement, 3);
 });

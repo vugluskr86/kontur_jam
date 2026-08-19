@@ -23,6 +23,8 @@ import { WeaponView } from '../render/WeaponView.js';
 import { LevelFactory } from '../world/LevelFactory.js';
 import { LEVEL_META } from '../data/narrative.js';
 import { AudioSystem } from '../audio/AudioSystem.js';
+import { loadAudioConfigFromStorage } from '../audio/audioConfig.js';
+import { SlimeSystem } from '../game/SlimeSystem.js';
 
 export class Game {
   constructor(root) {
@@ -45,9 +47,10 @@ export class Game {
     this.crafting = new CraftingSystem(this.inventory, this.belt, this.events);
     this.objective = new ObjectiveSystem(this.events);
     this.narrative = new NarrativeDirector(this.events, this.hud);
-    this.audio = new AudioSystem();
+    this.audio = new AudioSystem({ random: () => this.random.next(), config: loadAudioConfigFromStorage() });
     this.quest = new ProgressionSystem(this.events);
     this.player = new Player({ camera: this.camera, input: this.input, collision: this.collision, events: this.events, infection: this.infection });
+    this.slime = new SlimeSystem({ events: this.events, infection: this.infection, player: this.player, quest: this.quest });
     this.weaponView = new WeaponView(this.camera);
     this.sporeManager = new SporeManager({ scene: this.scene, inventory: this.inventory, infection: this.infection, events: this.events });
     this.enemies = new EnemyDirector({
@@ -69,7 +72,7 @@ export class Game {
       events: this.events, textures: this.textures, objective: this.objective,
       inventory: this.inventory, belt: this.belt, crafting: this.crafting,
       narrative: this.narrative, infection: this.infection, player: this.player,
-      hud: this.hud, quest: this.quest
+      hud: this.hud, quest: this.quest, slime: this.slime
     });
 
     this.clock = new THREE.Clock();
@@ -134,20 +137,35 @@ export class Game {
     this.events.on('craft:completed', () => this.audio.pickup());
     this.events.on('spore:collected', () => { this.hud.showMessage('+1 СПОРА О-41', 0.65); this.audio.pickup(); });
     this.events.on('quest:pickup', () => this.audio.pickup());
+    this.events.on('slime:attuned', ({ value }) => { this.audio.slimeContact?.(value); this.hud.showMessage(`О-41 // РЕЗОНАНС ${value}`, 1.1); });
+    this.events.on('slime:enter', ({ kind }) => { if (kind === 'hazard') this.audio.previewAmbient('sporeHiss'); });
     this.events.on('inventory:full', () => this.hud.showMessage('РЮКЗАК ЗАПОЛНЕН')); 
-    this.events.on('player:damaged', () => this.hud.flashDamage());
+    this.events.on('player:damaged', ({ source } = {}) => { this.hud.flashDamage(); this.audio.playerHit(source); });
     this.events.on('player:died', () => this.hud.showDeath());
-    this.events.on('enemy:wail', () => { this.player.applyWail(); this.hud.jamCompass(); this.audio.wail(); });
+    this.events.on('enemy:wail', (payload = {}) => { this.player.applyWail(); this.hud.jamCompass(); this.audio.wail(payload); });
     this.events.on('boss:immune', () => this.hud.showMessage('РЕАКЦИИ НЕТ // НУЖЕН РЕЗОНАТОР', 0.8));
+    this.events.on('enemy:damaged', (payload) => this.audio.enemyHit(payload));
+    this.events.on('enemy:killed', (payload) => this.audio.enemyDeath(payload));
+    this.events.on('enemy:voice', (payload) => this.audio.enemyVoice(payload));
+    this.events.on('enemy:attack', (payload) => this.audio.enemyAttack(payload));
+    this.events.on('enemy:sporeBurst', (payload) => this.audio.sporeBurst(payload));
+    this.events.on('weapon:fungalBurst', (payload) => this.audio.fungalBurst(payload));
+    this.events.on('level:exit-opened', () => this.audio.door());
+    this.events.on('boss:phase', ({ phase }) => this.audio.bossPhase(phase));
+    this.events.on('player:shield', () => this.audio.shield());
+    this.events.on('narrative:line', (line) => this.audio.narrativeLine(line));
+    this.events.on('narrative:end', () => this.audio.stopRadio());
+    this.events.on('narrative:interrupt', () => this.audio.stopRadio());
     this.events.on('infection:tier', ({ to }) => {
       const labels = ['НОРМА', 'СПОРЫ В КРОВИ', 'СЕНСОРНЫЕ СБОИ', 'РЕЗОНАНС', 'КРИТИЧЕСКИЙ РЕЗОНАНС'];
       this.hud.setSystemLine(`БИОСКАНЕР // ${labels[to]}`);
       if (to >= 2) this.hud.showMessage(labels[to], 1.2);
+      this.audio.infectionTier(to);
     });
-    this.events.on('infection:inhaler', () => this.hud.showMessage('ИНГАЛЯТОР // СЕНСОРНАЯ ПОГРЕШНОСТЬ', 1.2));
-    this.events.on('world:teleport', ({ kind }) => this.hud.showMessage(kind === 'loop' ? 'КООРДИНАТЫ НЕ ИЗМЕНИЛИСЬ' : 'ПРОСТРАНСТВЕННАЯ ОШИБКА', 0.9));
+    this.events.on('infection:inhaler', () => { this.hud.showMessage('ИНГАЛЯТОР // СЕНСОРНАЯ ПОГРЕШНОСТЬ', 1.2); this.audio.inhaler(); });
+    this.events.on('world:teleport', ({ kind }) => { this.hud.showMessage(kind === 'loop' ? 'КООРДИНАТЫ НЕ ИЗМЕНИЛИСЬ' : 'ПРОСТРАНСТВЕННАЯ ОШИБКА', 0.9); this.audio.teleport(kind); });
     this.events.on('world:hallucination', ({ active }) => { this.hallucination = active ? 1 : 0; });
-    this.events.on('world:flicker', ({ strength = 1 } = {}) => { this.flicker = Math.max(this.flicker, strength); });
+    this.events.on('world:flicker', ({ strength = 1 } = {}) => { this.flicker = Math.max(this.flicker, strength); this.audio.flicker(); });
     this.events.on('audio:hallucination', () => { this.audio.tone(72, 0.42, 'sine', 0.07, 18); });
     this.events.on('level:complete', ({ to }) => {
       if (this.gameEnded) return;
@@ -155,9 +173,10 @@ export class Game {
       this.loadLevel(to);
     });
     this.events.on('game:ending', ({ ending }) => {
+      this.audio.ending(ending);
       this.gameEnded = true;
       this.paused = true;
-      this.endingEffect = ending === 'burn' ? -1 : 1;
+      this.endingEffect = ({ burn: -1, merge: 1, broadcast: 2, sever: -2 }[ending] ?? 0);
       this.hud.showEnding(ending);
       document.exitPointerLock?.();
     });
@@ -168,6 +187,7 @@ export class Game {
     this.weapons.clear();
     this.currentLevel = id;
     this.currentLevelContext = this.levelFactory.load(id);
+    this.audio.setLevel(id, this.currentLevelContext.audio ?? {});
     this.player.resetForLevel(this.currentLevelContext.spawn, this.currentLevelContext.yaw);
     const meta = LEVEL_META[id];
     this.hud.showTransition(meta);
@@ -192,6 +212,7 @@ export class Game {
     }
 
     if (this.input.consume('Space')) this.narrative.skip();
+    if (this.input.consume('KeyM')) this.hud.showMessage(this.audio.toggleMute() ? 'ЗВУК // ВЫКЛ' : 'ЗВУК // ВКЛ', 0.7);
     if (this.input.consume('KeyR') && this.player.dead) location.reload();
 
     if (!this.paused && !this.player.dead && !this.gameEnded) {
@@ -201,6 +222,7 @@ export class Game {
       this.weapons.update(dt, false);
       this.enemies.update(dt, this.player.position);
       this.sporeManager.update(this.time, this.player.position);
+      this.slime.update(dt, this.player.position);
       this.interactions.update(this.player.position, this.input, this.hud);
       this.triggers.update(this.player.position);
       this.levelFactory.update(dt);
@@ -214,6 +236,29 @@ export class Game {
     }
 
     const meta = LEVEL_META[this.currentLevel];
+    const moving = !this.paused && !this.player.dead && (
+      this.input.down('KeyW') || this.input.down('KeyS') || this.input.down('KeyA') || this.input.down('KeyD')
+    );
+    let minEnemyDistance = Infinity;
+    for (const enemy of this.enemies.enemies) {
+      if (!enemy.alive) continue;
+      minEnemyDistance = Math.min(minEnemyDistance, enemy.group.position.distanceTo(this.player.position));
+    }
+    const danger = Number.isFinite(minEnemyDistance) ? Math.max(0, 1 - minEnemyDistance / 7) : 0;
+    this.audio.update(dt, {
+      level: this.currentLevel,
+      position: this.player.position,
+      yaw: this.player.yaw,
+      health: this.player.health,
+      maxHealth: this.player.maxHealth,
+      infection: this.infection.value / 100,
+      danger,
+      moving,
+      slowed: this.player.slowTimer > 0,
+      paused: this.paused,
+      dead: this.player.dead
+    });
+
     this.hud.update(dt, {
       player: this.player,
       infection: this.infection,
@@ -223,13 +268,16 @@ export class Game {
       objective: this.objective,
       enemies: this.enemies,
       spores: this.sporeManager,
-      levelMeta: meta
+      levelMeta: meta,
+      slime: this.slime
     });
 
     this.retro.render(this.scene, this.camera, this.time, {
       infection: this.infection.distortion,
       wail: this.enemies.wailDistortion,
       hive: this.enemies.hiveDistortion,
+      slime: this.slime.intensity,
+      slimeHazard: this.slime.hazard,
       hallucination: this.hallucination,
       ending: this.endingEffect,
       flicker: this.flicker
@@ -244,7 +292,7 @@ export class Game {
     }
     this.infection.useInhaler();
     this.player.heal(1.5);
-    this.audio.tone(310, 0.12, 'sine', 0.12, -90);
+
   }
 
   #useShield() {
@@ -253,7 +301,7 @@ export class Game {
       return;
     }
     this.player.activateShield(6);
-    this.audio.tone(180, 0.20, 'square', 0.12, 120);
+
   }
 
   #resize() {
