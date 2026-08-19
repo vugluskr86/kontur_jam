@@ -1,0 +1,21 @@
+{
+  "name": "kontur-041-fps-full-prototype",
+  "private": true,
+  "version": "0.4.2",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy": "npm run build && git add docs/ && git commit -m \"Deploy to GitHub Pages\" && git push",
+    "test": "npm run test:logic && npm run test:levels",
+    "test:logic": "node --test test/systems.test.js test/progression.test.js",
+    "test:levels": "node --import ./test/register-three-stub.mjs --test test/levels.test.js"
+  },
+  "dependencies": {
+    "three": "^0.183.0"
+  },
+  "devDependencies": {
+    "vite": "^7.1.0"
+  }
+}

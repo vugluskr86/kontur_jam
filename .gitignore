@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Local Vite output (GitHub Pages build is committed to docs/)
+dist/
+
+# Environment files and local secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs and test artifacts
+*.log
+coverage/
+
+# Editor and operating-system files
+.DS_Store
+Thumbs.db
+.vscode/
