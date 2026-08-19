@@ -36,6 +36,7 @@ export class Game {
     this.scene.add(this.camera);
     this.retro = new RetroRenderer(this.hud.viewport);
     this.input = new InputController(this.retro.renderer.domElement);
+    this.input.bindMobileControls(this.hud.mobileControlElements());
     this.random = new SeededRandom(0x0411986);
     this.textures = new TextureFactory(() => this.random.next());
     this.collision = new CollisionWorld();
@@ -85,11 +86,13 @@ export class Game {
     this.endingEffect = 0;
     this.flicker = 0;
     this.gameEnded = false;
+    this.orientationBlocked = false;
 
     this.#bindUI();
     this.#bindEvents();
     this.#resize();
     window.addEventListener('resize', () => this.#resize());
+    window.addEventListener('orientationchange', () => this.#resize());
   }
 
   start() {
@@ -215,7 +218,7 @@ export class Game {
     if (this.input.consume('KeyM')) this.hud.showMessage(this.audio.toggleMute() ? 'ЗВУК // ВЫКЛ' : 'ЗВУК // ВКЛ', 0.7);
     if (this.input.consume('KeyR') && this.player.dead) location.reload();
 
-    if (!this.paused && !this.player.dead && !this.gameEnded) {
+    if (!this.paused && !this.orientationBlocked && !this.player.dead && !this.gameEnded) {
       if (this.input.consume('KeyH')) this.#useInhaler();
       if (this.input.consume('KeyQ')) this.#useShield();
       this.player.update(dt, false);
@@ -236,9 +239,7 @@ export class Game {
     }
 
     const meta = LEVEL_META[this.currentLevel];
-    const moving = !this.paused && !this.player.dead && (
-      this.input.down('KeyW') || this.input.down('KeyS') || this.input.down('KeyA') || this.input.down('KeyD')
-    );
+    const moving = !this.paused && !this.orientationBlocked && !this.player.dead && this.input.isMoving();
     let minEnemyDistance = Infinity;
     for (const enemy of this.enemies.enemies) {
       if (!enemy.alive) continue;
@@ -305,6 +306,10 @@ export class Game {
   }
 
   #resize() {
+    const isTouchDevice = this.input.isTouchDevice();
+    this.orientationBlocked = isTouchDevice && window.innerHeight > window.innerWidth;
+    this.input.setMobileEnabled(isTouchDevice && !this.orientationBlocked);
+    this.hud.setOrientationWarning(this.orientationBlocked);
     const { aspect } = this.retro.resize();
     this.camera.aspect = aspect;
     this.camera.updateProjectionMatrix();

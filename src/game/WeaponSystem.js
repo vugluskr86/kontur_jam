@@ -33,7 +33,7 @@ export class WeaponSystem {
     this.#updateTracers(dt);
     this.#updateFungal(dt);
     this.weaponView.show(this.belt.activeId);
-    const moving = this.input.down('KeyW') || this.input.down('KeyS') || this.input.down('KeyA') || this.input.down('KeyD');
+    const moving = this.input.isMoving();
     this.weaponView.update(dt, moving && !paused);
     if (paused || this.player.dead) return;
 

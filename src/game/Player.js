@@ -52,14 +52,12 @@ export class Player {
 
     const forward = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
     const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
-    const move = new THREE.Vector3();
-    if (this.input.down('KeyW')) move.add(forward);
-    if (this.input.down('KeyS')) move.sub(forward);
-    if (this.input.down('KeyD')) move.add(right);
-    if (this.input.down('KeyA')) move.sub(right);
+    const axes = this.input.movement();
+    const move = new THREE.Vector3()
+      .addScaledVector(forward, axes.y)
+      .addScaledVector(right, axes.x);
 
     if (move.lengthSq() > 0) {
-      move.normalize();
       const slowFactor = this.slowTimer > 0 ? 0.45 : 1;
       const speed = this.baseSpeed * slowFactor;
       this.collision.move(this.position, move.x * speed * dt, move.z * speed * dt, this.radius);

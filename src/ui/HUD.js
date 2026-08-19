@@ -34,6 +34,17 @@ export class HUD {
             <div id="subtitle"><b id="subtitleSpeaker"></b><span id="subtitleText"></span></div>
             <div id="transition"><div id="transitionCode">КОНТУР-041</div><strong id="transitionTitle"></strong><small id="transitionSubtitle"></small></div>
             <div id="ending"></div>
+            <div id="mobileControls" aria-label="Mobile controls">
+              <div class="mobile-stick" id="moveStick"><i id="moveKnob"></i><span>MOVE</span></div>
+              <div class="mobile-stick" id="lookStick"><i id="lookKnob"></i><span>LOOK</span></div>
+              <div class="mobile-actions">
+                <button id="mobileFire" class="mobile-fire">FIRE</button>
+                <button data-mobile-action="KeyE">E<br><small>USE</small></button>
+                <button data-mobile-action="Digit1">1</button>
+                <button data-mobile-action="Digit2">2</button>
+                <button data-mobile-action="KeyI">II<br><small>MENU</small></button>
+              </div>
+            </div>
           </div>
         </main>
 
@@ -74,6 +85,10 @@ export class HUD {
           <div class="start-actions"><button id="startButton">ВОЙТИ В 1-Й КОНТУР</button><a class="sandbox-link" href="./audio-sandbox.html">AUDIO SANDBOX</a></div>
         </div>
       </div>
+
+      <div id="orientationWarning" role="alert">
+        <div><b>ROTATE DEVICE</b><span>KONTUR-041 REQUIRES LANDSCAPE ORIENTATION</span></div>
+      </div>
     `;
 
     const q = (selector) => this.root.querySelector(selector);
@@ -86,6 +101,7 @@ export class HUD {
     this.healthNum = q('#healthNum'); this.sporeCount = q('#sporeCount'); this.hpText = q('#hpText'); this.infectionText = q('#infectionText'); this.infectionFill = q('#infectionFill');
     this.healthCells = q('#healthCells'); this.pauseInventory = q('#pauseInventory'); this.recipes = q('#recipes'); this.weapons = q('#weapons');
     this.systemLine = q('#systemLine'); this.resonanceText = q('#resonanceText');
+    this.mobileControls = q('#mobileControls'); this.moveStick = q('#moveStick'); this.moveKnob = q('#moveKnob'); this.lookStick = q('#lookStick'); this.lookKnob = q('#lookKnob'); this.mobileFire = q('#mobileFire'); this.mobileActions = [...this.root.querySelectorAll('[data-mobile-action]')]; this.orientationWarning = q('#orientationWarning');
     this.beltSlots = [...this.root.querySelectorAll('.weapon-slot')];
     this.belt0Name = q('#belt0Name'); this.belt1Name = q('#belt1Name'); this.belt0Ammo = q('#belt0Ammo'); this.belt1Ammo = q('#belt1Ammo');
 
@@ -98,9 +114,11 @@ export class HUD {
   bindStart(handler) { this.startButton.addEventListener('click', handler); }
   bindCraft(handler) { this.recipes.addEventListener('click', (event) => { const button = event.target.closest('[data-craft]'); if (button) handler(button.dataset.craft); }); }
   bindEquip(handler) { this.weapons.addEventListener('click', (event) => { const button = event.target.closest('[data-equip]'); if (button) handler(Number(button.dataset.slot), button.dataset.equip); }); }
+  mobileControlElements() { return { moveStick: this.moveStick, moveKnob: this.moveKnob, lookStick: this.lookStick, lookKnob: this.lookKnob, fireButton: this.mobileFire, actionButtons: this.mobileActions }; }
 
   setPointerLocked(locked) { if (locked) this.startOverlay.classList.add('hidden'); }
   setPauseVisible(visible) { this.inventoryVisible = visible; this.pauseOverlay.classList.toggle('visible', visible); }
+  setOrientationWarning(visible) { this.orientationWarning.classList.toggle('visible', visible); }
   setInteractionPrompt(text) { this.interactionPrompt.textContent = text; }
   setObjective(text) { this.objectiveText.textContent = text || '—'; }
   setSystemLine(text) { this.systemLine.textContent = text; }
