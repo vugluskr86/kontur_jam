@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  // GitHub Pages serves this repository from /kontur041-fps-full/.
-  base: '/kontur041-fps-full/',
+  // GitHub Pages serves this repository from /kontur_jam/.
+  base: '/kontur_jam/',
   server: { host: '0.0.0.0' },
   build: {
     target: 'es2022',
